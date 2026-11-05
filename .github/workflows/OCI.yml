@@ -1,58 +1,61 @@
-name: Create OCI With Terraform
+name: OCI Terraform
 on:
   workflow_dispatch:
-
-jobs: 
-  OCI-IaC-Deployment:
+    inputs:
+      operation:
+        description: Planificar o aplicar
+        type: choice
+        default: plan
+        options: [plan, apply]
+permissions:
+  contents: read
+concurrency:
+  group: oci-terraform-lab
+  cancel-in-progress: false
+jobs:
+  terraform:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     defaults:
       run:
         shell: bash
         working-directory: Terraform
+    env:
+      TF_IN_AUTOMATION: 'true'
+      TF_INPUT: 'false'
+      TF_VAR_compartment_id: ${{ secrets.OCI_COMPARTMENT_OCID }}
     steps:
-      - name: 'Checkout'
-        uses: actions/checkout@v2
-      
-      - name: 'Write Config & Key Files'
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: '1.14.6'
+          terraform_wrapper: false
+      - name: Configurar OCI
+        env:
+          OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_KEY_FILE: ${{ secrets.OCI_KEY_FILE }}
         run: |
-          mkdir ~/.oci
-          echo "[DEFAULT]" >> ~/.oci/config
-          echo "user=${{secrets.OCI_USER_OCID}}" >> ~/.oci/config
-          echo "fingerprint=${{secrets.OCI_FINGERPRINT}}" >> ~/.oci/config
-          echo "region=${{secrets.OCI_REGION}}" >> ~/.oci/config
-          echo "tenancy=${{secrets.OCI_TENANCY_OCID}}" >> ~/.oci/config
-          echo "key_file=~/.oci/key.pem" >> ~/.oci/config
-          echo "${{secrets.OCI_KEY_FILE}}" >> ~/.oci/key.pem
-      
-      - name: 'Install OCI CLI'
-        run: |
-          curl -L -O https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh
-          chmod +x install.sh
-          ./install.sh --accept-all-defaults
-          echo "/home/runner/bin" >> $GITHUB_PATH
-          exec -l $SHELL
-      
-      - name: 'Fix OCI Config File Permissions'
-        run: |
-          oci setup repair-file-permissions --file /home/runner/.oci/config
-          oci setup repair-file-permissions --file /home/runner/.oci/key.pem
+          set -euo pipefail
+          for value in "$OCI_USER_OCID" "$OCI_FINGERPRINT" "$OCI_TENANCY_OCID" "$OCI_KEY_FILE" "$TF_VAR_compartment_id"; do
+            test -n "$value" || { echo 'Falta un secreto requerido'; exit 1; }
+          done
+          umask 077
+          mkdir -p "$HOME/.oci"
+          printf '%s\n' "$OCI_KEY_FILE" > "$HOME/.oci/key.pem"
+          printf '[DEFAULT]\nuser=%s\nfingerprint=%s\nregion=sa-saopaulo-1\ntenancy=%s\nkey_file=%s\n' \
+            "$OCI_USER_OCID" "$OCI_FINGERPRINT" "$OCI_TENANCY_OCID" "$HOME/.oci/key.pem" > "$HOME/.oci/config"
+      - run: terraform fmt -check -recursive
+      - run: terraform init -input=false -backend-config=backend.hcl
+      - run: terraform validate
+      - run: terraform plan -input=false -out=deployment.tfplan
+      - name: Aplicar
+        if: inputs.operation == 'apply'
+        run: terraform apply -input=false deployment.tfplan
+      - name: Limpiar credenciales
+        if: always()
+        run: rm -f "$HOME/.oci/key.pem" "$HOME/.oci/config" deployment.tfplan
 
-      - name: Terraform Init
-        id: init
-        run: terraform init
-        
-      - name: Terraform Validate
-        id: validate
-        run: terraform validate
-  
-      - name: Terraform Plan
-        id: plan
-        run: terraform plan
-        continue-on-error: true
-  
-      - name: Terraform Plan Status
-        if: steps.plan.outcome == 'failure'
-        run: exit 1
-
-      - name: Terraform Apply
-        run: terraform apply -auto-approve
