@@ -8,7 +8,7 @@ output "subnet_id" {
   value = oci_core_subnet.subnetA_pub.id
 }
 output "instance_public_ip" {
-  value = var.create_instance ? try(oci_core_instance.ic_pub_vm-A[0].public_ip, null) : try(data.oci_core_vnic.existing[0].public_ip, null)
+  value = var.create_instance ? try(oci_core_instance.ic_pub_vm-A[0].public_ip, null) : try(data.oci_core_vnic.existing[0].public_ip_address, null)
 }
 
 output "instance_id" {
