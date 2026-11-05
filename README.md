@@ -1,65 +1,70 @@
-# Laboratorio OCI con Terraform y GitHub Actions
+# OCI con Terraform y GitHub Actions: VM existente
 
-Adaptación del ejemplo de RekhuGopal para jesus-z, región sa-saopaulo-1.
+Laboratorio de jesus-z en São Paulo (sa-saopaulo-1), adaptado del ejemplo de RekhuGopal.
 
-## Resultado del despliegue
+## Arquitectura final
 
-Se crearon y verificaron en OCI:
-- Compartimento jesus-z-oci-terraform-lab.
-- VCN vcn01 y subred IC_pub_snet-A.
-- Internet gateway IC_IG-A y ruta de salida.
-- Lista de seguridad lab-ssh, con SSH restringido al CIDR autorizado.
-- Bucket privado jesus-z-terraform-state, con versionado habilitado.
+Terraform administra el compartimento jesus-z-oci-terraform-lab, la VCN vcn01,
+la subred IC_pub_snet-A, su internet gateway, la tabla de rutas y la lista de seguridad.
+El estado reside en el bucket privado jesus-z-terraform-state, con versionado y bloqueo.
 
-La VM jesus-z-lab-vm está pendiente: OCI rechazó LaunchInstance con
-500-InternalError: Out of host capacity. Los informes de capacidad devolvieron
-OUT_OF_HOST_CAPACITY para E2 Micro y A1 Flex en los tres fault domains de São Paulo.
-La VM existente atipax-docker-vm no fue modificada.
+El laboratorio consulta la VM existente atipax-docker-vm mediante data sources de OCI:
+- Estado observado en OCI: RUNNING.
+- Shape: VM.Standard.E2.1.Micro; 1 GB de RAM.
+- IP pública observada: 137.131.247.197.
+- La instancia conserva su VNIC y su red atipax-vcn.
 
-## Configuración de la VM pendiente
+La VM es un recurso externo consultado por este proyecto. Su ciclo de vida, sus
+aplicaciones, sus claves SSH y su red original se administran fuera de este estado.
+No se importó como recurso modificable ni se trasladó a la VCN del laboratorio.
+El ejemplo muestra cómo combinar recursos creados con infraestructura existente.
 
-- Shape VM.Standard.E2.1.Micro, elegible para Always Free sujeto a los límites de la cuenta.
-- Oracle Linux 9, imagen compatible de São Paulo.
-- Volumen de arranque de 50 GB.
-- Clave SSH pública propia incluida en lab.auto.tfvars.json.
-- Acceso por SSH limitado al secreto OCI_SSH_SOURCE_CIDR, validado como IPv4 /32.
+## Configuración
 
-## Estado y credenciales
+Terraform/lab.auto.tfvars.json configura:
+- create_instance = false
+- existing_instance_id: OCID de atipax-docker-vm
+- existing_vnic_id: OCID de su VNIC
 
-Terraform usa el backend nativo oci, con bloqueo de estado y autenticación APIKey.
-backend.hcl contiene el bucket, namespace y región; no contiene la clave privada.
-El estado se guarda en lab/terraform.tfstate dentro del bucket privado.
+Terraform/existing.tf consulta instancia, VNIC y subred. Los outputs incluyen
+instance_id, instance_name, instance_state, instance_public_ip y existing_instance_vcn_id.
+Los outputs compartment_id, vcn_id y subnet_id identifican la red nueva del laboratorio.
 
-GitHub Actions usa los secretos OCI_USER_OCID, OCI_TENANCY_OCID,
-OCI_FINGERPRINT, OCI_KEY_FILE, OCI_COMPARTMENT_OCID y OCI_SSH_SOURCE_CIDR.
-La clave privada de API no está incluida en el repositorio ni en el ZIP del código.
-La clave SSH privada se entrega por separado al propietario y tampoco se publica.
+La clave SSH generada para la VM nueva que no pudo crearse NO da acceso a la VM
+existente. Para conectarse a atipax-docker-vm debe usarse su clave SSH original.
 
-## Reintentar cuando OCI tenga capacidad
+## Ejecución
 
-1. Abrir Actions > OCI Terraform > Run workflow.
-2. Seleccionar operation=plan para revisar cambios pendientes.
-3. Seleccionar operation=apply para reintentar el despliegue de la VM.
+Actions > OCI Terraform > Run workflow > operation=plan o operation=apply.
+El workflow ejecuta fmt, init, validate, plan y, cuando se elige apply, aplica el plan.
+Usa Terraform 1.14.6 y el proveedor oracle/oci 7.x.
 
-Terraform conserva los recursos ya creados mediante el estado remoto. No borrar
-el bucket de estado ni sustituirlo por el almacenamiento del autor del video.
-Si cambia la IP pública del equipo, actualizar OCI_SSH_SOURCE_CIDR con su nuevo /32
-antes de aplicar. La VM recibirá una IP pública cuando OCI pueda crearla.
+Secrets: OCI_USER_OCID, OCI_TENANCY_OCID, OCI_FINGERPRINT, OCI_KEY_FILE,
+OCI_COMPARTMENT_OCID y OCI_SSH_SOURCE_CIDR. El último configura solamente la lista
+de seguridad de la red nueva del laboratorio, no las reglas de la VM existente.
+Las claves privadas no forman parte del repositorio ni del ZIP del código.
 
-## Comprobaciones realizadas
+## Comprobaciones y alcance
 
-- terraform fmt -check y terraform validate: correctos en GitHub Actions.
-- Plan de red: 5 altas, 0 cambios, 0 eliminaciones.
-- Plan de red y VM: 7 altas, 0 cambios, 0 eliminaciones.
-- Apply: 6 recursos Terraform creados; VM rechazada por falta de capacidad.
-- Plan posterior al apply: 1 alta (VM), 0 cambios, 0 eliminaciones.
-- Verificación independiente mediante API de OCI: red disponible, bucket privado
-  con versionado; ninguna VM creada en el compartimento del laboratorio.
+Validación, plan y apply completados correctamente en GitHub Actions.
+Resultado final: Apply complete! Resources: 0 added, 0 changed, 0 destroyed.
+El estado remoto incluye la VM existente como consulta, junto a los seis
+recursos administrados de la red del laboratorio.
+
+Se comprobó el estado RUNNING y la configuración de red mediante la API de OCI.
+La consulta del sistema invitado mediante Oracle Cloud Agent no fue entregada y
+se canceló. La petición HTTP externa agotó el tiempo de espera; no se verificó
+la salud de la aplicación Docker ni el acceso SSH. Esta integración no despliega
+aplicaciones dentro de la VM.
+
+## Antecedente
+
+Se intentó crear una segunda VM Always Free. OCI respondió Out of host capacity,
+y los informes de capacidad marcaron Micro y A1 sin disponibilidad. El propietario
+eligió reutilizar la VM existente y se deshabilitó la creación de una nueva.
 
 Repositorio: https://github.com/jesus-z/OracleCloudInfrastructure
-Intento de despliegue: https://github.com/jesus-z/OracleCloudInfrastructure/actions/runs/41947759337
 Origen: https://github.com/RekhuGopal/OracleCloudInfrastructure
 Video: https://www.youtube.com/watch?v=3rmROBpBu9A
 
-Plan posterior correcto: https://github.com/jesus-z/OracleCloudInfrastructure/actions/runs/41947955687
-
+Ejecución correcta: https://github.com/jesus-z/OracleCloudInfrastructure/actions/runs/41949843850
