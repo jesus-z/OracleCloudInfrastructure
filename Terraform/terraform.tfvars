@@ -1,2 +1,1 @@
-# La variable compartment_id se proporciona mediante TF_VAR_compartment_id.
-compartment_name = "oci-terraform-lab"
+# Configuración del laboratorio en lab.auto.tfvars.json.

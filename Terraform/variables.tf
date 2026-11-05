@@ -67,6 +67,16 @@ variable "create_instance" {
   default     = false
 }
 
+variable "ssh_source_cidr" {
+  description = "IP pública autorizada para SSH, con máscara /32. Vacío deshabilita el ingreso."
+  type        = string
+  default     = ""
+  validation {
+    condition     = var.ssh_source_cidr == "" || (can(cidrnetmask(var.ssh_source_cidr)) && endswith(var.ssh_source_cidr, "/32"))
+    error_message = "Configura una única dirección IPv4 con máscara /32."
+  }
+}
+
 variable "ic_pub_vm_A" {
   description = "Datos regionales de la VM; configurar antes de habilitar create_instance."
   type = object({

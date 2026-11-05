@@ -32,13 +32,38 @@ resource "oci_core_vcn" "example_vcn" {
 
 resource "oci_core_subnet" "subnetA_pub" {
   #Required
-  compartment_id = oci_identity_compartment.example_compartment.id
-  vcn_id         = oci_core_vcn.example_vcn.id
-  cidr_block     = var.subnetA_pub.cidr_block
+  compartment_id    = oci_identity_compartment.example_compartment.id
+  vcn_id            = oci_core_vcn.example_vcn.id
+  cidr_block        = var.subnetA_pub.cidr_block
+  security_list_ids = [oci_core_security_list.lab.id]
   #Optional
   display_name               = var.subnetA_pub.display_name
   prohibit_public_ip_on_vnic = !var.subnetA_pub.is_public
   prohibit_internet_ingress  = !var.subnetA_pub.is_public
+}
+
+resource "oci_core_security_list" "lab" {
+  compartment_id = oci_identity_compartment.example_compartment.id
+  vcn_id         = oci_core_vcn.example_vcn.id
+  display_name   = "lab-ssh"
+  egress_security_rules {
+    protocol         = "all"
+    destination      = "0.0.0.0/0"
+    destination_type = "CIDR_BLOCK"
+  }
+  dynamic "ingress_security_rules" {
+    for_each = var.ssh_source_cidr == "" ? [] : [var.ssh_source_cidr]
+    content {
+      protocol    = "6"
+      source      = ingress_security_rules.value
+      source_type = "CIDR_BLOCK"
+      description = "SSH desde la IP autorizada"
+      tcp_options {
+        min = 22
+        max = 22
+      }
+    }
+  }
 }
 
 ############################################
@@ -84,8 +109,9 @@ resource "oci_core_instance" "ic_pub_vm-A" {
   display_name        = var.ic_pub_vm_A.display_name
 
   source_details {
-    source_id   = var.ic_pub_vm_A.image_ocid
-    source_type = "image"
+    source_id               = var.ic_pub_vm_A.image_ocid
+    source_type             = "image"
+    boot_volume_size_in_gbs = 50
   }
 
   dynamic "shape_config" {
