@@ -67,6 +67,26 @@ variable "create_instance" {
   default     = false
 }
 
+variable "existing_instance_id" {
+  description = "OCID de una VM existente que el laboratorio consulta."
+  type        = string
+  default     = ""
+  validation {
+    condition     = !(var.create_instance && var.existing_instance_id != "")
+    error_message = "Elegir crear una VM o usar la existente."
+  }
+}
+
+variable "existing_vnic_id" {
+  description = "VNIC de la VM existente para consultar su IP y subred."
+  type        = string
+  default     = ""
+  validation {
+    condition     = var.existing_instance_id == "" || var.existing_vnic_id != ""
+    error_message = "La VM existente requiere existing_vnic_id."
+  }
+}
+
 variable "ssh_source_cidr" {
   description = "IP pública autorizada para SSH, con máscara /32. Vacío deshabilita el ingreso."
   type        = string
