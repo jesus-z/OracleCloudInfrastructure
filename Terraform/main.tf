@@ -1,8 +1,7 @@
-/*
 # main.tf
 locals {
-  cmpt_name_prefix = "A506"
-  time_f           = formatdate("HHmmss", timestamp())
+  cmpt_name_prefix = "jesus-z"
+
 }
 
 ############################################
@@ -12,7 +11,7 @@ resource "oci_identity_compartment" "example_compartment" {
   # Required
   compartment_id = var.compartment_id
   description    = var.compartment_description
-  name           = "${local.cmpt_name_prefix}-${var.compartment_name}-${local.time_f}"
+  name           = "${local.cmpt_name_prefix}-${var.compartment_name}"
 }
 
 ############################################
@@ -78,6 +77,7 @@ resource "oci_core_default_route_table" "the_route_table" {
 # ############################################
 
 resource "oci_core_instance" "ic_pub_vm-A" {
+  count               = var.create_instance ? 1 : 0
   compartment_id      = oci_identity_compartment.example_compartment.id
   shape               = var.ic_pub_vm_A.shape.name
   availability_domain = var.ic_pub_vm_A.availability_domain
@@ -89,7 +89,7 @@ resource "oci_core_instance" "ic_pub_vm-A" {
   }
 
   dynamic "shape_config" {
-    for_each = [true]
+    for_each = endswith(var.ic_pub_vm_A.shape.name, ".Flex") ? [true] : []
     content {
       #Optional
       memory_in_gbs = var.ic_pub_vm_A.shape.memory_in_gbs
@@ -106,4 +106,3 @@ resource "oci_core_instance" "ic_pub_vm-A" {
     ssh_authorized_keys = join("\n", [for k in var.ic_pub_vm_A.ssh_authorized_keys : chomp(k)])
   }
 }
-*/

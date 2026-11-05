@@ -61,18 +61,40 @@ variable "internet_gateway_A" {
 # Compute Instance
 ############################################
 
+variable "create_instance" {
+  description = "Crear la VM del laboratorio; requiere image OCID, AD y clave SSH propios."
+  type        = bool
+  default     = false
+}
+
 variable "ic_pub_vm_A" {
-  description = "The details of the compute instance"
+  description = "Datos regionales de la VM; configurar antes de habilitar create_instance."
+  type = object({
+    display_name        = string
+    assign_public_ip    = bool
+    availability_domain = string
+    image_ocid          = string
+    shape = object({
+      name          = string
+      ocpus         = number
+      memory_in_gbs = number
+    })
+    ssh_authorized_keys = list(string)
+  })
   default = {
-    display_name : "IC_pub_vm-A"
-    assign_public_ip : true
-    availability_domain : "RjRj:US-SANJOSE-1-AD-1"
-    image_ocid : "ocid1.image.oc1.us-sanjose-1.aaaaaaaaoy3dg6f2w5edbvow2i7yymcyxlswnut5xf5ffad7us2eft6kp7oq"
-    shape : {
+    display_name        = "lab-vm"
+    assign_public_ip    = true
+    availability_domain = ""
+    image_ocid          = ""
+    shape = {
       name          = "VM.Standard.E2.1.Micro"
       ocpus         = 1
       memory_in_gbs = 1
     }
-    ssh_authorized_keys = ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC3qjNb/fSTmjHXClwcI2oARKrB5jH7RePjYWVfXPi6rhvOLN5u7spg3RtuU7mJpF6yEFm/p26rYPrGQWCZaHnDtwbE+U5QxGZYibI02S5cCzvULdcFiuno3F5S8b56ir0LEPHAOaNAKjPIOjQpIFBbN1boEXDq9VF6hFCb/YSCs03tnnVwicIi/BnL/5zhIPKLT/LG3DjZLxgcomnichvdxpNaYphqJnBuCjfoS9yvFxdgvzC0JheUMsWa4xgviYC7D9LoQOx3mIVlLOoh0kzcGcbwjfXQrAb2RFv/etFPibvSB0cmaDxWkwlkaHM0ZrnnAgWuSWig+sh/jOTVCUCP rsa-key-20240817"]
+    ssh_authorized_keys = []
+  }
+  validation {
+    condition     = !var.create_instance || (var.ic_pub_vm_A.image_ocid != "" && var.ic_pub_vm_A.availability_domain != "" && length(var.ic_pub_vm_A.ssh_authorized_keys) > 0)
+    error_message = "Para crear la VM configura image_ocid, availability_domain y ssh_authorized_keys de tu cuenta y región."
   }
 }
