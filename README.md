@@ -1,34 +1,39 @@
-# OracleCloudInfrastructure
+# Laboratorio OCI con Terraform y GitHub Actions
 
-# Get Image ID in Windows PowerShell
-$compartmentId = "<your_compartment_id>"
+Adaptación del repositorio de RekhuGopal para jesus-z y sa-saopaulo-1.
 
-oci compute image list --compartment-id $compartmentId --all | 
-    ConvertFrom-Json | 
-    Select-Object -ExpandProperty data | 
-    Where-Object { 
-        $_."operating-system" -eq "Oracle Linux" -and 
-        $_."operating-system-version" -eq "8" 
-    } | 
-    Select-Object -First 1 | 
-    Select-Object id, "display-name"
+Estado: preparación local. Todavía NO desplegado ni publicado en el fork.
 
-# OCI CLI
-oci compute image list --compartment-id ocid1.tenancy.oc1..aaaaaaaah5sadgcgkfkaub3ghdgt6w5nuonrndkdb2dcupyoh3j7cxvy4goa --all
+Recursos: compartimento, VCN, subred pública, internet gateway y ruta de salida.
+La VM del ejemplo se conserva como opción (create_instance = true). Antes de
+habilitarla deben elegirse la imagen, availability domain y clave SSH propios.
 
+## Configuración de GitHub Actions
 
-# Get free eligible OCI images
-# Define the compartment ID
-$compartmentId = "<your-compartment-id>"
+Secrets requeridos:
+- OCI_USER_OCID
+- OCI_TENANCY_OCID
+- OCI_FINGERPRINT
+- OCI_KEY_FILE: clave privada PEM de una API key registrada en OCI
+- OCI_COMPARTMENT_OCID: compartimento padre autorizado
+- TF_HTTP_ADDRESS: URL PAR propia de lectura/escritura para un único objeto terraform.tfstate
 
-# Get the list of images
-$imageList = oci compute image list --compartment-id $compartmentId --all | ConvertFrom-Json
+No usar la URL de almacenamiento ni las claves del autor del video.
+El backend HTTP de este laboratorio no ofrece bloqueo distribuido. El workflow
+serializa las ejecuciones del repositorio; no ejecutar Terraform desde otros
+repositorios ni localmente al mismo tiempo. La URL PAR es una credencial y debe
+mantenerse en Secrets, con fecha de vencimiento definida y bucket privado.
 
-oci compute image list --compartment-id $compartmentId --all | 
-    ConvertFrom-Json | 
-    Select-Object -ExpandProperty data | 
-    Where-Object { 
-        $_."display-name" -like "*Free*" 
-    } | 
-    Select-Object -First 1 | 
-    Select-Object id, "display-name"
+## Ejecución
+
+1. Configurar las credenciales y el objeto de estado propios.
+2. Actions > OCI Terraform > Run workflow > plan.
+3. Revisar el plan; después ejecutar operation=apply.
+4. Confirmar recursos e identificadores en la consola de OCI.
+
+El workflow instala Terraform 1.14.6 y usa el proveedor oracle/oci 7.x.
+Se ha ejecutado terraform fmt. La instalación local del proveedor está bloqueada
+por un error de acceso al calcular su checksum; falta ejecutar validate y plan.
+
+Origen: https://github.com/RekhuGopal/OracleCloudInfrastructure
+Video: https://www.youtube.com/watch?v=3rmROBpBu9A
