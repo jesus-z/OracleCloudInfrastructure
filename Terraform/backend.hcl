@@ -1,0 +1,6 @@
+bucket              = "jesus-z-terraform-state"
+namespace           = "grmzzdftstej"
+key                 = "lab/terraform.tfstate"
+region              = "sa-saopaulo-1"
+auth                = "APIKey"
+config_file_profile = "DEFAULT"
