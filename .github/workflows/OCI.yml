@@ -23,6 +23,7 @@ jobs:
     env:
       TF_IN_AUTOMATION: 'true'
       TF_INPUT: 'false'
+      TF_VAR_ssh_source_cidr: ${{ secrets.OCI_SSH_SOURCE_CIDR }}
       TF_VAR_compartment_id: ${{ secrets.OCI_COMPARTMENT_OCID }}
     steps:
       - uses: actions/checkout@v4
